@@ -159,6 +159,10 @@ function pdfthreads_misc() {
 	
 	$mybb->input['action'] = $mybb->get_input('action');
 	if($mybb->input['action'] == "pdfthreads") {
+
+		if(!$mybb->user['uid']) {
+			error_no_permission();
+		}
 		
 		class finalPDF extends tFPDF
 		{		
@@ -182,85 +186,100 @@ function pdfthreads_misc() {
 		
 		$tid = (int)$mybb->input['tid'];
 		$thread = get_thread($tid);
-		
-		// generate pdf
-		$pdf = new finalPDF();
-		$pdf->AliasNbPages();
-		
-		// front page view
-		if($thread) {
-			$pdf->AddPage();
-			$pdf->SetFont('Arial','B',14);
-			$pdf->SetY(90);
-			$pdf->MultiCell(185,10,$thread['subject'],0,'C');
-			$pdf->SetFont('Courier','',10);
-			$partners = explode(",", $thread['partners']);
-			$list = [];
-			foreach($partners as $partner) {
-				$user = get_user($partner);
-				$list[] = $user['username'];
-			}
-			$pdf->MultiCell(185,10,implode(" & ", $list),0,'C');
-			$pdf->MultiCell(185,10,date("d.m.Y",$thread['ipdate']),0,'C');
-			$pdf->MultiCell(185,10,$thread['iport'],0,'C');
+		$forum = get_forum($thread['fid']);
+		$isforum = false;
 
-		}
-		
-		// content pages
-		$pdf->title = $thread['subject'];
-		$pdf->AddPage();
-		$pdf->AddFont('DejaVu','','DejaVuSansCondensed.ttf',true);
-		$pdf->SetFont('DejaVu','',9);
-		$pdf->SetX(30);
-		
-		if($thread) {	
-			$pdf->title = $thread['subject'];		
-			$sql = "SELECT message, username FROM ".TABLE_PREFIX."posts WHERE tid = '{$tid}' ORDER BY pid ASC";
-			$query = $db->query($sql);
-			while($post = $db->fetch_array($query)) {
-				
-				$pdf->author = $post['username'];
-				
-				// author
+		$forum['parentlist'] = ",".$forum['parentlist'].",";
+		$selectedforums = explode(",", $mybb->settings['pdfthreads_forums']);
+		foreach($selectedforums as $selected) {
+			if(preg_match("/,{$selected},/i", $forum['parentlist']) || $mybb->settings['pdfthreads_forums'] == "-1") {	
+				$isforum = true;
+			}
+		}	
+
+		if($isforum) {
+			
+			// generate pdf
+			$pdf = new finalPDF();
+			$pdf->AliasNbPages();
+			
+			// front page view
+			if($thread) {
+				$pdf->AddPage();
 				$pdf->SetFont('Arial','B',14);
-				$pdf->SetX(30);
-				$pdf->Cell(40,10,$post['username']);
+				$pdf->SetY(90);
+				$pdf->MultiCell(185,10,$thread['subject'],0,'C');
+				$pdf->SetFont('Courier','',10);
+				$partners = explode(",", $thread['partners']);
+				$list = [];
+				foreach($partners as $partner) {
+					$user = get_user($partner);
+					$list[] = $user['username'];
+				}
+				$pdf->MultiCell(185,10,implode(" & ", $list),0,'C');
+				$pdf->MultiCell(185,10,date("d.m.Y",$thread['ipdate']),0,'C');
+				$pdf->MultiCell(185,10,$thread['iport'],0,'C');
+
+			}
+			
+			// content pages
+			$pdf->title = $thread['subject'];
+			$pdf->AddPage();
+			$pdf->AddFont('DejaVu','','DejaVuSansCondensed.ttf',true);
+			$pdf->SetFont('DejaVu','',9);
+			$pdf->SetX(30);
+			
+			if($thread) {	
+				$pdf->title = $thread['subject'];		
+				$sql = "SELECT message, username FROM ".TABLE_PREFIX."posts WHERE tid = '{$tid}' ORDER BY pid ASC";
+				$query = $db->query($sql);
+				while($post = $db->fetch_array($query)) {
+					
+					$pdf->author = $post['username'];
+					
+					// author
+					$pdf->SetFont('Arial','B',14);
+					$pdf->SetX(30);
+					$pdf->Cell(40,10,$post['username']);
+					
+					$pdf->ln();
+					
+					// post
+					$pdf->SetFont('DejaVu','',9);
+					// Strip BBCode from Message
+					$pattern = '|[[\/\!]*?[^\[\]]*?]|si';
+					$replace = '';
+					$post['message'] = preg_replace($pattern, $replace, $post['message']);
+					$pdf->SetX(30);
+					$pdf->MultiCell(150,5,strip_tags($post['message']));
+					
+					$pdf->ln();
+					
+				}
 				
-				$pdf->ln();
+				$title = $thread['subject'];
 				
-				// post
-				$pdf->SetFont('DejaVu','',9);
+			}
+			// no tid? generate pdf from post...	
+			else {
+				
+				$pid = (int)$mybb->input['pid'];
+				
+				$post = get_post($pid);
+				$title = $post['subject'];
+							
 				// Strip BBCode from Message
 				$pattern = '|[[\/\!]*?[^\[\]]*?]|si';
 				$replace = '';
 				$post['message'] = preg_replace($pattern, $replace, $post['message']);
-				$pdf->SetX(30);
-				$pdf->MultiCell(150,5,strip_tags($post['message']));
 				
-				$pdf->ln();
+				$pdf->MultiCell(150,5,strip_tags($post['subject'].' // '.$post['message']));
 				
 			}
-			
-			$title = $thread['subject'];
-			
+			$pdf->Output('I', $title.'.pdf');
+		} else {
+			error_no_permission();
 		}
-		// no tid? generate pdf from post...	
-		else {
-			
-			$pid = (int)$mybb->input['pid'];
-			
-			$post = get_post($pid);
-			$title = $post['subject'];
-						
-			// Strip BBCode from Message
-			$pattern = '|[[\/\!]*?[^\[\]]*?]|si';
-			$replace = '';
-			$post['message'] = preg_replace($pattern, $replace, $post['message']);
-			
-			$pdf->MultiCell(150,5,strip_tags($post['subject'].' // '.$post['message']));
-			
-		}
-		$pdf->Output('I', $title.'.pdf');
 	}
 }
 
