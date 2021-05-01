@@ -210,15 +210,17 @@ function pdfthreads_misc() {
 				$pdf->SetY(90);
 				$pdf->MultiCell(185,10,$thread['subject'],0,'C');
 				$pdf->SetFont('Courier','',10);
-				$partners = explode(",", $thread['partners']);
-				$list = [];
-				foreach($partners as $partner) {
-					$user = get_user($partner);
+
+				// get tracker information			
+				$query = $db->simple_select("ipt_scenes_partners", "uid", "tid='{$thread['tid']}'");
+				while($userlist = $db->fetch_array($query_2)) {
+					$user = get_user($userlist['uid']);
 					$list[] = $user['username'];
 				}
+				$ipdate = $db->fetch_field($db->query("ipt_scenes", "date", "tid='{$thread['tid']}'"), "date");
+
 				$pdf->MultiCell(185,10,implode(" & ", $list),0,'C');
-				$pdf->MultiCell(185,10,date("d.m.Y",$thread['ipdate']),0,'C');
-				$pdf->MultiCell(185,10,$thread['iport'],0,'C');
+				$pdf->MultiCell(185,10,date("d.m.Y",$ipdate),0,'C');
 
 			}
 			
