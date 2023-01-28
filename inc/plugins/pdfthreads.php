@@ -185,6 +185,11 @@ function pdfthreads_misc() {
 		}
 		
 		$tid = (int)$mybb->input['tid'];
+		if(!$tid) {
+			$pid = (int)$mybb->input['pid'];
+			$post = get_post($pid);
+			$tid = $post['tid'];
+		}
 		$thread = get_thread($tid);
 		$forum = get_forum($thread['fid']);
 		$isforum = false;
@@ -197,8 +202,7 @@ function pdfthreads_misc() {
 			}
 		}	
 
-		if($isforum) {
-			
+		if($isforum) {			
 			// generate pdf
 			$pdf = new finalPDF();
 			$pdf->AliasNbPages();
